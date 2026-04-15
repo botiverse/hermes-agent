@@ -276,10 +276,6 @@ class SlockAdapter(BasePlatformAdapter):
 
         target = self._build_target(channel_type, channel_name, parent_channel_name, message_id, sender_name)
         self._channel_targets[channel_id] = target
-        logger.info(
-            "Slock inbound: type=%s name=%s parent=%s channel_id=%s target=%s",
-            channel_type, channel_name, parent_channel_name, channel_id[:8], target,
-        )
 
         if channel_type == "thread":
             chat_type = "group"
@@ -409,10 +405,6 @@ class SlockAdapter(BasePlatformAdapter):
         metadata = metadata or {}
         thread_id = metadata.get("thread_id")
         target = self._resolve_target(chat_id, thread_id)
-        logger.info(
-            "Slock send: chat_id=%s thread_id=%s resolved_target=%s",
-            chat_id[:8] if chat_id else "?", thread_id[:8] if thread_id else "?", target,
-        )
 
         chunks = self.truncate_message(content, self.MAX_MESSAGE_LENGTH)
         last_msg_id = None
