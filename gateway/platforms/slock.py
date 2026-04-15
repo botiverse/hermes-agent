@@ -262,9 +262,7 @@ class SlockAdapter(BasePlatformAdapter):
 
         sender_type = msg.get("sender_type", "user")
         if sender_type == "agent":
-            sender_id = msg.get("sender_id", "")
-            if sender_id == self._agent_id:
-                return
+            return
 
         channel_id = msg.get("channel_id", "")
         channel_name = msg.get("channel_name", "")
@@ -282,7 +280,7 @@ class SlockAdapter(BasePlatformAdapter):
         if channel_type == "thread":
             chat_type = "group"
             thread_id = channel_id
-            chat_id = parent_channel_id or channel_id
+            chat_id = channel_id
         elif channel_type == "dm":
             chat_type = "dm"
             thread_id = None
