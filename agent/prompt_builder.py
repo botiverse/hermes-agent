@@ -382,6 +382,12 @@ PLATFORM_HINTS = {
         "your response. Images are sent as native photos, and other files arrive as downloadable "
         "documents."
     ),
+    "slock": (
+        "You are in a Slock workspace, a team collaboration platform. "
+        "Markdown formatting is supported. You can send media files natively: "
+        "include MEDIA:/absolute/path/to/file in your response. Images and "
+        "documents are uploaded as attachments."
+    ),
 }
 
 # ---------------------------------------------------------------------------

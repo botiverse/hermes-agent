@@ -67,6 +67,7 @@ class Platform(Enum):
     WEIXIN = "weixin"
     BLUEBUBBLES = "bluebubbles"
     QQBOT = "qqbot"
+    SLOCK = "slock"
 
 
 @dataclass
@@ -1143,6 +1144,28 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
                 chat_id=qq_home,
                 name=os.getenv("QQ_HOME_CHANNEL_NAME", "Home"),
             )
+
+    # Slock
+    slock_token = os.getenv("SLOCK_MACHINE_TOKEN")
+    slock_server = os.getenv("SLOCK_SERVER_URL")
+    slock_agent = os.getenv("SLOCK_AGENT_ID")
+    if slock_token and slock_server and slock_agent:
+        if Platform.SLOCK not in config.platforms:
+            config.platforms[Platform.SLOCK] = PlatformConfig()
+        config.platforms[Platform.SLOCK].enabled = True
+        config.platforms[Platform.SLOCK].token = slock_token
+        config.platforms[Platform.SLOCK].extra.update({
+            "server_url": slock_server.rstrip("/"),
+            "machine_token": slock_token,
+            "agent_id": slock_agent,
+        })
+    slock_home = os.getenv("SLOCK_HOME_CHANNEL")
+    if slock_home and Platform.SLOCK in config.platforms:
+        config.platforms[Platform.SLOCK].home_channel = HomeChannel(
+            platform=Platform.SLOCK,
+            chat_id=slock_home,
+            name=os.getenv("SLOCK_HOME_CHANNEL_NAME", "Home"),
+        )
 
     # Session settings
     idle_minutes = os.getenv("SESSION_IDLE_MINUTES")

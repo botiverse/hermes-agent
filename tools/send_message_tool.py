@@ -163,6 +163,7 @@ def _handle_send(args):
         "weixin": Platform.WEIXIN,
         "email": Platform.EMAIL,
         "sms": Platform.SMS,
+        "slock": Platform.SLOCK,
     }
     platform = platform_map.get(platform_name)
     if not platform:
@@ -429,6 +430,8 @@ async def _send_to_platform(platform, pconfig, chat_id, message, thread_id=None,
             result = await _send_bluebubbles(pconfig.extra, chat_id, chunk)
         elif platform == Platform.QQBOT:
             result = await _send_qqbot(pconfig, chat_id, chunk)
+        elif platform == Platform.SLOCK:
+            result = await _send_slock(pconfig.token, pconfig.extra, chat_id, chunk)
         else:
             result = {"error": f"Direct sending not yet implemented for {platform.value}"}
 
@@ -798,6 +801,32 @@ async def _send_mattermost(token, extra, chat_id, message):
         return {"success": True, "platform": "mattermost", "chat_id": chat_id, "message_id": data.get("id")}
     except Exception as e:
         return _error(f"Mattermost send failed: {e}")
+
+
+async def _send_slock(token, extra, chat_id, message):
+    """Send via Slock REST API."""
+    try:
+        import aiohttp
+    except ImportError:
+        return {"error": "aiohttp not installed. Run: pip install aiohttp"}
+    try:
+        server_url = (extra.get("server_url") or os.getenv("SLOCK_SERVER_URL", "")).rstrip("/")
+        machine_token = extra.get("machine_token") or token or os.getenv("SLOCK_MACHINE_TOKEN", "")
+        agent_id = extra.get("agent_id") or os.getenv("SLOCK_AGENT_ID", "")
+        if not server_url or not machine_token or not agent_id:
+            return {"error": "Slock not configured (SLOCK_SERVER_URL, SLOCK_MACHINE_TOKEN, SLOCK_AGENT_ID required)"}
+        url = f"{server_url}/internal/agent/{agent_id}/send"
+        headers = {"Authorization": f"Bearer {machine_token}", "Content-Type": "application/json"}
+        target = chat_id if chat_id.startswith("#") or chat_id.startswith("dm:") else f"#{chat_id}"
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+            async with session.post(url, headers=headers, json={"target": target, "content": message}) as resp:
+                if resp.status >= 400:
+                    body = await resp.text()
+                    return _error(f"Slock API error ({resp.status}): {body}")
+                data = await resp.json()
+        return {"success": True, "platform": "slock", "chat_id": chat_id, "message_id": data.get("messageId")}
+    except Exception as e:
+        return _error(f"Slock send failed: {e}")
 
 
 async def _send_matrix(token, extra, chat_id, message):
