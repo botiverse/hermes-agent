@@ -6533,6 +6533,13 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
                 return None
             return MSGraphWebhookAdapter(config)
 
+        elif platform == Platform.SLOCK:
+            from gateway.platforms.slock import SlockAdapter, check_slock_requirements
+            if not check_slock_requirements():
+                logger.warning("Raft: aiohttp not installed")
+                return None
+            return SlockAdapter(config)
+
         elif platform == Platform.BLUEBUBBLES:
             from gateway.platforms.bluebubbles import BlueBubblesAdapter, check_bluebubbles_requirements
             if not check_bluebubbles_requirements():

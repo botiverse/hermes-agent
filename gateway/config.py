@@ -163,7 +163,9 @@ class Platform(Enum):
     WEIXIN = "weixin"
     BLUEBUBBLES = "bluebubbles"
     QQBOT = "qqbot"
+    SLOCK = "slock"
     YUANBAO = "yuanbao"
+
     @classmethod
     def _missing_(cls, value):
         """Accept unknown platform names only for known plugin adapters.
@@ -471,6 +473,7 @@ _PLATFORM_CONNECTED_CHECKERS: dict[Platform, Callable[[PlatformConfig], bool]] =
     Platform.SMS: lambda cfg: bool(os.getenv("TWILIO_ACCOUNT_SID")),
     Platform.API_SERVER: lambda cfg: True,
     Platform.WEBHOOK: lambda cfg: True,
+    Platform.SLOCK: lambda cfg: bool(cfg.extra.get("bridge_token")),
     Platform.MSGRAPH_WEBHOOK: lambda cfg: bool(
         str(cfg.extra.get("client_state") or "").strip()
     ),
@@ -1681,6 +1684,53 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
                 pass
         if webhook_secret:
             config.platforms[Platform.WEBHOOK].extra["secret"] = webhook_secret
+
+    # Raft wake endpoint platform. ``SLOCK_*`` names are kept as compatibility
+    # aliases for pre-rename bridge/plugin releases and on-disk configs.
+    raft_enabled_raw = (
+        os.getenv("RAFT_WAKE_ENDPOINT_ENABLED")
+        or os.getenv("SLOCK_WAKE_ENDPOINT_ENABLED", "")
+    )
+    slock_enabled = raft_enabled_raw.lower() in {
+        "true",
+        "1",
+        "yes",
+    }
+    slock_bridge_token = (
+        os.getenv("RAFT_WAKE_ENDPOINT_TOKEN")
+        or os.getenv("SLOCK_WAKE_ENDPOINT_TOKEN", "")
+    )
+    if slock_enabled or slock_bridge_token:
+        if Platform.SLOCK not in config.platforms:
+            config.platforms[Platform.SLOCK] = PlatformConfig()
+        config.platforms[Platform.SLOCK].enabled = True
+        if slock_bridge_token:
+            config.platforms[Platform.SLOCK].extra["bridge_token"] = slock_bridge_token
+        slock_host = os.getenv("RAFT_WAKE_ENDPOINT_HOST") or os.getenv(
+            "SLOCK_WAKE_ENDPOINT_HOST"
+        )
+        if slock_host:
+            config.platforms[Platform.SLOCK].extra["host"] = slock_host
+        slock_port = os.getenv("RAFT_WAKE_ENDPOINT_PORT") or os.getenv(
+            "SLOCK_WAKE_ENDPOINT_PORT"
+        )
+        if slock_port:
+            try:
+                config.platforms[Platform.SLOCK].extra["port"] = int(slock_port)
+            except ValueError:
+                pass
+        slock_path = os.getenv("RAFT_WAKE_ENDPOINT_PATH") or os.getenv(
+            "SLOCK_WAKE_ENDPOINT_PATH"
+        )
+        if slock_path:
+            config.platforms[Platform.SLOCK].extra["path"] = slock_path
+        slock_runtime_session = os.getenv("RAFT_WAKE_RUNTIME_SESSION") or os.getenv(
+            "SLOCK_WAKE_RUNTIME_SESSION"
+        )
+        if slock_runtime_session:
+            config.platforms[Platform.SLOCK].extra["runtime_session"] = (
+                slock_runtime_session
+            )
 
     # Microsoft Graph webhook platform
     msgraph_webhook_enabled = os.getenv("MSGRAPH_WEBHOOK_ENABLED", "").lower() in {
