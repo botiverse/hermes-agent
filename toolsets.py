@@ -537,7 +537,7 @@ TOOLSETS = {
     },
 
     "hermes-slock": {
-        "description": "Raft wake endpoint toolset - inspect pending Raft messages and reply through raft message send",
+        "description": "Raft channel toolset - inspect pending Raft messages and reply through raft message send",
         "tools": _HERMES_CORE_TOOLS,
         "includes": []
     },
