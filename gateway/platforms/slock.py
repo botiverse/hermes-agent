@@ -1,4 +1,4 @@
-"""Raft wake endpoint platform adapter.
+"""Raft channel platform adapter.
 
 This adapter is intentionally narrow: it receives content-free wake hints from
 the Raft bridge and injects a synthetic message into Hermes' normal gateway
@@ -40,7 +40,7 @@ DEFAULT_PORT = 8646
 DEFAULT_PATH = "/wake"
 DEFAULT_RUNTIME_SESSION = "default"
 DEFAULT_MAX_BODY_BYTES = 16_384
-BRIDGE_TOKEN_HEADER = "x-slock-bridge-token"
+BRIDGE_TOKEN_HEADER = "x-raft-bridge-token"
 
 _CONTENT_FIELD_NAMES = {
     "body",
@@ -54,7 +54,7 @@ _CONTENT_FIELD_NAMES = {
 
 
 def check_slock_requirements() -> bool:
-    """Check if Raft wake endpoint dependencies are available."""
+    """Check if Raft channel dependencies are available."""
     return AIOHTTP_AVAILABLE
 
 
@@ -78,7 +78,7 @@ def _has_content_field(value: Any) -> bool:
 
 
 class SlockAdapter(BasePlatformAdapter):
-    """Local HTTP wake endpoint for Raft bridge delivery."""
+    """Local HTTP endpoint for Raft channel bridge delivery."""
 
     def __init__(self, config: PlatformConfig):
         super().__init__(config, Platform.SLOCK)
@@ -104,7 +104,7 @@ class SlockAdapter(BasePlatformAdapter):
         if not self._bridge_token:
             self._set_fatal_error(
                 "missing_bridge_token",
-                "RAFT_WAKE_ENDPOINT_TOKEN, SLOCK_WAKE_ENDPOINT_TOKEN, or platforms.slock.extra.bridge_token is required",
+                "RAFT_CHANNEL_TOKEN or platforms.slock.extra.bridge_token is required",
                 retryable=False,
             )
             return False
@@ -121,7 +121,7 @@ class SlockAdapter(BasePlatformAdapter):
                     sock.settimeout(1)
                     sock.connect(("127.0.0.1", self._port))
                 logger.error(
-                    "[slock] Port %d already in use. Set SLOCK_WAKE_ENDPOINT_PORT or platforms.slock.extra.port",
+                    "[slock] Port %d already in use. Set RAFT_CHANNEL_PORT or platforms.slock.extra.port",
                     self._port,
                 )
                 return False
@@ -133,7 +133,7 @@ class SlockAdapter(BasePlatformAdapter):
         site = web.TCPSite(self._runner, self._host, self._port)
         await site.start()
         self._mark_connected()
-        logger.info("[slock] Wake endpoint listening on %s:%d%s", self._host, self._port, self._path)
+        logger.info("[slock] Raft channel listening on %s:%d%s", self._host, self._port, self._path)
         return True
 
     async def disconnect(self) -> None:
@@ -151,7 +151,7 @@ class SlockAdapter(BasePlatformAdapter):
         metadata: Optional[Dict[str, Any]] = None,
     ) -> SendResult:
         hint = (
-            "Raft wake endpoint is wake-only; adapter send does not deliver to Slock. "
+            "Raft channel is wake-only; adapter send does not deliver to Slock. "
             "Use `raft message send --target \"<target>\"` with the exact target from "
             "`raft message check`, or the legacy `slock message send` alias."
         )
@@ -193,9 +193,8 @@ class SlockAdapter(BasePlatformAdapter):
                 return web.json_response({"ok": False, "error": "invalid_payload"}, status=400)
             payload = parsed
 
-        # Do not gate on payload["schema"]: the published bridge still sends the
-        # historical Claude-channel schema id, and future ids follow Raft's
-        # wake-endpoint compatibility contract rather than this adapter.
+        # Do not gate on payload["schema"]: the bridge owns schema evolution;
+        # Hermes only verifies that wake hints are content-free.
         if _has_content_field(payload):
             return web.json_response({"ok": False, "error": "content_not_allowed"}, status=400)
 
@@ -239,7 +238,7 @@ class SlockAdapter(BasePlatformAdapter):
         )
         source = self.build_source(
             chat_id=self._runtime_session,
-            chat_name="Raft wake endpoint",
+            chat_name="Raft channel",
             chat_type="dm",
             user_id="slock-bridge",
             user_name="Raft Bridge",

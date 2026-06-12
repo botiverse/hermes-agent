@@ -1,4 +1,4 @@
-"""Tests for the Raft wake endpoint adapter."""
+"""Tests for the Raft channel adapter."""
 
 from unittest.mock import AsyncMock
 
@@ -15,8 +15,8 @@ from gateway.platforms.slock import (
 )
 from gateway.session import build_session_key
 
-HISTORICAL_BRIDGE_SCHEMA = "slock-claude-code-channel-wake.v1"
-NEUTRAL_WAKE_SCHEMA = "slock.wake-endpoint/v1"
+RAFT_CHANNEL_SCHEMA = "raft-channel-wake.v1"
+FUTURE_RAFT_CHANNEL_SCHEMA = "raft-channel-wake.v2"
 
 
 def _make_config(**extra):
@@ -111,7 +111,7 @@ class TestSlockWakeHttp:
         assert body["runtimeSession"] == "default"
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("schema", [HISTORICAL_BRIDGE_SCHEMA, NEUTRAL_WAKE_SCHEMA])
+    @pytest.mark.parametrize("schema", [RAFT_CHANNEL_SCHEMA, FUTURE_RAFT_CHANNEL_SCHEMA])
     async def test_accepts_content_free_wake_as_internal_event(self, schema):
         adapter = _make_adapter()
         adapter.set_message_handler(AsyncMock())
@@ -163,7 +163,7 @@ class TestSlockWakeHttp:
 
         source = adapter.build_source(
             chat_id="default",
-            chat_name="Raft wake endpoint",
+            chat_name="Raft channel",
             chat_type="dm",
             user_id="slock-bridge",
             user_name="Raft Bridge",
@@ -184,9 +184,9 @@ class TestSlockWakeHttp:
 
 class TestSlockConfig:
     def test_env_overrides_enable_raft_platform(self, monkeypatch):
-        monkeypatch.setenv("RAFT_WAKE_ENDPOINT_TOKEN", "bridge-secret")
-        monkeypatch.setenv("RAFT_WAKE_ENDPOINT_PORT", "8765")
-        monkeypatch.setenv("RAFT_WAKE_RUNTIME_SESSION", "main")
+        monkeypatch.setenv("RAFT_CHANNEL_TOKEN", "bridge-secret")
+        monkeypatch.setenv("RAFT_CHANNEL_PORT", "8765")
+        monkeypatch.setenv("RAFT_CHANNEL_RUNTIME_SESSION", "main")
 
         config = GatewayConfig()
         _apply_env_overrides(config)
@@ -198,20 +198,6 @@ class TestSlockConfig:
         assert slock_config.extra["port"] == 8765
         assert slock_config.extra["runtime_session"] == "main"
         assert config.get_connected_platforms() == [Platform.SLOCK]
-
-    def test_legacy_slock_env_overrides_remain_compatible(self, monkeypatch):
-        monkeypatch.setenv("SLOCK_WAKE_ENDPOINT_TOKEN", "bridge-secret")
-        monkeypatch.setenv("SLOCK_WAKE_ENDPOINT_PORT", "8765")
-        monkeypatch.setenv("SLOCK_WAKE_RUNTIME_SESSION", "main")
-
-        config = GatewayConfig()
-        _apply_env_overrides(config)
-
-        slock_config = config.platforms[Platform.SLOCK]
-        assert slock_config.enabled is True
-        assert slock_config.extra["bridge_token"] == "bridge-secret"
-        assert slock_config.extra["port"] == 8765
-        assert slock_config.extra["runtime_session"] == "main"
 
     def test_platform_metadata_and_toolset_are_registered(self):
         from agent.prompt_builder import PLATFORM_HINTS

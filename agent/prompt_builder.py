@@ -658,7 +658,7 @@ PLATFORM_HINTS = {
         "Use MEDIA:/absolute/path instead."
     ),
     "slock": (
-        "You are running from a Raft wake endpoint. Wake hints are content-free; "
+        "You are running from a Raft channel. Wake hints are content-free; "
         "run `raft message check` to read pending Raft messages before deciding what to do. "
         "When you reply, send it through Raft using the exact `target=` shown by "
         "`raft message check`: `raft message send --target \"<target>\"`. Preserve any "
