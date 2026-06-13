@@ -1,9 +1,10 @@
 """Raft channel platform adapter.
 
-This adapter is intentionally narrow: it receives content-free wake hints from
-the Raft bridge and injects a synthetic message into Hermes' normal gateway
-session pipeline. The bridge remains responsible for Raft message cursors and
-body materialization; Hermes tells the agent to run ``raft message check``.
+Starts a local wake endpoint, spawns ``raft agent bridge`` as a child process,
+and injects content-free wake hints into Hermes' normal gateway session pipeline.
+Token and port are auto-generated when not provided via env/config.
+The bridge remains responsible for Raft message cursors and body materialization;
+Hermes tells the agent to run ``raft message check``.
 """
 
 from __future__ import annotations
@@ -12,8 +13,12 @@ import asyncio
 import hmac
 import json
 import logging
+import os
+import secrets
+import shutil
+import subprocess
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 try:
     from aiohttp import web
@@ -36,7 +41,7 @@ from gateway.session import build_session_key
 logger = logging.getLogger(__name__)
 
 DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 8646
+DEFAULT_PORT = 0
 DEFAULT_PATH = "/wake"
 DEFAULT_RUNTIME_SESSION = "default"
 DEFAULT_MAX_BODY_BYTES = 16_384
@@ -95,6 +100,7 @@ class SlockAdapter(BasePlatformAdapter):
             extra.get("max_body_bytes", DEFAULT_MAX_BODY_BYTES)
         )
         self._runner = None
+        self._bridge_process: Optional[subprocess.Popen] = None
 
     @property
     def runtime_session(self) -> str:
@@ -102,12 +108,8 @@ class SlockAdapter(BasePlatformAdapter):
 
     async def connect(self) -> bool:
         if not self._bridge_token:
-            self._set_fatal_error(
-                "missing_bridge_token",
-                "RAFT_CHANNEL_TOKEN or platforms.slock.extra.bridge_token is required",
-                retryable=False,
-            )
-            return False
+            self._bridge_token = secrets.token_hex(32)
+            logger.info("[slock] Auto-generated bridge token")
 
         app = web.Application()
         app.router.add_get("/health", self._handle_health)
@@ -132,16 +134,64 @@ class SlockAdapter(BasePlatformAdapter):
         await self._runner.setup()
         site = web.TCPSite(self._runner, self._host, self._port)
         await site.start()
+
+        bound_port = self._port
+        if bound_port == 0 and site._server and site._server.sockets:
+            bound_port = site._server.sockets[0].getsockname()[1]
+
         self._mark_connected()
-        logger.info("[slock] Raft channel listening on %s:%d%s", self._host, self._port, self._path)
+        logger.info("[slock] Raft channel listening on %s:%d%s", self._host, bound_port, self._path)
+
+        self._spawn_bridge(bound_port)
         return True
 
     async def disconnect(self) -> None:
+        self._stop_bridge()
         if self._runner:
             await self._runner.cleanup()
             self._runner = None
         self._mark_disconnected()
         logger.info("[slock] Disconnected")
+
+    def _spawn_bridge(self, port: int) -> None:
+        raft_bin = shutil.which("raft") or shutil.which("slock")
+        if not raft_bin:
+            logger.warning("[slock] raft/slock CLI not found in PATH; bridge not spawned — wake-only polling mode")
+            return
+
+        profile = os.environ.get("RAFT_PROFILE") or os.environ.get("SLOCK_PROFILE", "")
+        if not profile:
+            logger.warning("[slock] RAFT_PROFILE not set; bridge not spawned")
+            return
+
+        endpoint = f"http://{self._host}:{port}{self._path}"
+        cmd: List[str] = [
+            raft_bin, "--profile", profile,
+            "agent", "bridge",
+            "--wake-adapter", "wake-channel",
+            "--wake-channel-endpoint", endpoint,
+        ]
+        env = {**os.environ, "RAFT_CHANNEL_TOKEN": self._bridge_token}
+        try:
+            self._bridge_process = subprocess.Popen(cmd, env=env)
+            logger.info("[slock] Spawned bridge pid=%d profile=%s endpoint=%s", self._bridge_process.pid, profile, endpoint)
+        except Exception:
+            logger.exception("[slock] Failed to spawn bridge")
+
+    def _stop_bridge(self) -> None:
+        proc = self._bridge_process
+        if proc is None:
+            return
+        self._bridge_process = None
+        try:
+            proc.terminate()
+            proc.wait(timeout=5)
+            logger.info("[slock] Bridge process terminated (pid=%d)", proc.pid)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            logger.warning("[slock] Bridge process killed after timeout (pid=%d)", proc.pid)
+        except Exception:
+            logger.exception("[slock] Error stopping bridge")
 
     async def send(
         self,
