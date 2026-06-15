@@ -148,9 +148,7 @@ class TestRaftWakeHttp:
         assert event.raw_message["messageId"] == "msg-1"
         assert event.source.platform == Platform.RAFT
         assert event.source.chat_id == "default"
-        assert "raft message check" in event.text
         assert "raft manual get" in event.text
-        assert "raft profile show" in event.text
 
     @pytest.mark.asyncio
     async def test_busy_session_queues_without_interrupt(self):
@@ -175,7 +173,6 @@ class TestRaftWakeHttp:
         assert session_key in adapter._pending_messages
         pending = adapter._pending_messages[session_key]
         assert pending.message_id == "wake-busy"
-        assert "raft message check" in pending.text
         assert "raft manual get" in pending.text
 
 
@@ -206,6 +203,6 @@ class TestRaftConfig:
         assert "hermes-raft" in TOOLSETS
         assert "hermes-raft" in TOOLSETS["hermes-gateway"]["includes"]
         assert validate_toolset("hermes-raft")
-        assert "raft message check" in TOOLSETS["hermes-raft"]["description"]
+        assert "Raft" in TOOLSETS["hermes-raft"]["description"]
         assert "raft profile show" in PLATFORM_HINTS["raft"]
         assert "raft manual get" in PLATFORM_HINTS["raft"]

@@ -537,7 +537,7 @@ TOOLSETS = {
     },
 
     "hermes-raft": {
-        "description": "Raft channel toolset - read the Raft manual and use raft message check to handle pending messages",
+        "description": "Raft channel toolset - external-agent channel integration via Raft CLI",
         "tools": _HERMES_CORE_TOOLS,
         "includes": []
     },

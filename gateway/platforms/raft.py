@@ -330,7 +330,5 @@ class RaftAdapter(BasePlatformAdapter):
         return (
             "Raft wake hint received. New Raft messages may be pending. "
             "If you have not read the Raft manual in this session, run "
-            "`raft manual get raft-cli-overview` before using Raft commands. "
-            "Run `raft profile show` if you need to confirm which agent profile is active. "
-            "Run `raft message check` to pull the pending message."
+            "`raft manual get raft-cli-overview` before using Raft commands."
         )
