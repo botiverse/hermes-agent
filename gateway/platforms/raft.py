@@ -201,9 +201,8 @@ class RaftAdapter(BasePlatformAdapter):
         metadata: Optional[Dict[str, Any]] = None,
     ) -> SendResult:
         hint = (
-            "Raft channel is wake-only; adapter send does not deliver to Raft. "
-            "Use `raft message send --target \"<target>\"` with the exact target from "
-            "`raft message check`."
+            "Raft channel is wake-only; adapter send does not deliver messages. "
+            "Use the Raft CLI to send messages — run `raft manual get raft-cli-overview` for usage."
         )
         logger.warning("[raft] %s Dropped adapter response for %s: %s", hint, chat_id, content[:200])
         return SendResult(success=False, error=hint, retryable=False)
@@ -330,8 +329,8 @@ class RaftAdapter(BasePlatformAdapter):
     def _wake_prompt() -> str:
         return (
             "Raft wake hint received. New Raft messages may be pending. "
-            "Run `raft message check` to inspect and handle them. "
-            "When you need to reply, use the exact `target=` shown by `raft message check` "
-            "with `raft message send --target \"<target>\"`; for thread targets, keep the "
-            "same channel-or-DM suffix."
+            "If you have not read the Raft manual in this session, run "
+            "`raft manual get raft-cli-overview` before using Raft commands. "
+            "Run `raft profile show` if you need to confirm which agent profile is active. "
+            "Run `raft message check` to pull the pending message."
         )

@@ -684,11 +684,10 @@ PLATFORM_HINTS = {
         "Use MEDIA:/absolute/path instead."
     ),
     "raft": (
-        "You are running from a Raft channel. Wake hints are content-free; "
-        "run `raft message check` to read pending Raft messages before deciding what to do. "
-        "When you reply, send it through Raft using the exact `target=` shown by "
-        "`raft message check`: `raft message send --target \"<target>\"`. Preserve any "
-        "thread suffix in that target."
+        "You are running from a Raft channel. "
+        "Run `raft manual get raft-cli-overview` to learn available Raft commands. "
+        "Run `raft profile show` to confirm which agent profile is active. "
+        "Run `raft message check` to read pending Raft messages before deciding what to do."
     ),
 }
 

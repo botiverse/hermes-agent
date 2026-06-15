@@ -57,7 +57,7 @@ class TestRaftWakeHttp:
         assert result.success is False
         assert result.retryable is False
         assert "wake-only" in result.error
-        assert "raft message send" in result.error
+        assert "raft manual get" in result.error
 
     @pytest.mark.asyncio
     async def test_rejects_missing_bridge_token(self):
@@ -149,8 +149,8 @@ class TestRaftWakeHttp:
         assert event.source.platform == Platform.RAFT
         assert event.source.chat_id == "default"
         assert "raft message check" in event.text
-        assert "raft message send" in event.text
-        assert 'target=' in event.text
+        assert "raft manual get" in event.text
+        assert "raft profile show" in event.text
 
     @pytest.mark.asyncio
     async def test_busy_session_queues_without_interrupt(self):
@@ -176,7 +176,7 @@ class TestRaftWakeHttp:
         pending = adapter._pending_messages[session_key]
         assert pending.message_id == "wake-busy"
         assert "raft message check" in pending.text
-        assert "raft message send" in pending.text
+        assert "raft manual get" in pending.text
 
 
 class TestRaftConfig:
@@ -206,6 +206,6 @@ class TestRaftConfig:
         assert "hermes-raft" in TOOLSETS
         assert "hermes-raft" in TOOLSETS["hermes-gateway"]["includes"]
         assert validate_toolset("hermes-raft")
-        assert "raft message send" in TOOLSETS["hermes-raft"]["description"]
+        assert "raft message check" in TOOLSETS["hermes-raft"]["description"]
+        assert "raft manual get" in PLATFORM_HINTS["raft"]
         assert "raft message check" in PLATFORM_HINTS["raft"]
-        assert "raft message send" in PLATFORM_HINTS["raft"]
