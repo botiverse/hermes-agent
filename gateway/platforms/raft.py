@@ -58,7 +58,7 @@ _CONTENT_FIELD_NAMES = {
 }
 
 
-def check_slock_requirements() -> bool:
+def check_raft_requirements() -> bool:
     """Check if Raft channel dependencies are available."""
     return AIOHTTP_AVAILABLE
 
@@ -82,11 +82,11 @@ def _has_content_field(value: Any) -> bool:
     return False
 
 
-class SlockAdapter(BasePlatformAdapter):
+class RaftAdapter(BasePlatformAdapter):
     """Local HTTP endpoint for Raft channel bridge delivery."""
 
     def __init__(self, config: PlatformConfig):
-        super().__init__(config, Platform.SLOCK)
+        super().__init__(config, Platform.RAFT)
         extra = config.extra or {}
         self._host: str = str(extra.get("host", DEFAULT_HOST))
         self._port: int = int(extra.get("port", DEFAULT_PORT))
@@ -109,7 +109,7 @@ class SlockAdapter(BasePlatformAdapter):
     async def connect(self) -> bool:
         if not self._bridge_token:
             self._bridge_token = secrets.token_hex(32)
-            logger.info("[slock] Auto-generated bridge token")
+            logger.info("[raft] Auto-generated bridge token")
 
         app = web.Application()
         app.router.add_get("/health", self._handle_health)
@@ -123,7 +123,7 @@ class SlockAdapter(BasePlatformAdapter):
                     sock.settimeout(1)
                     sock.connect(("127.0.0.1", self._port))
                 logger.error(
-                    "[slock] Port %d already in use. Set RAFT_CHANNEL_PORT or platforms.slock.extra.port",
+                    "[raft] Port %d already in use. Set RAFT_CHANNEL_PORT or platforms.raft.extra.port",
                     self._port,
                 )
                 return False
@@ -140,7 +140,7 @@ class SlockAdapter(BasePlatformAdapter):
             bound_port = site._server.sockets[0].getsockname()[1]
 
         self._mark_connected()
-        logger.info("[slock] Raft channel listening on %s:%d%s", self._host, bound_port, self._path)
+        logger.info("[raft] Raft channel listening on %s:%d%s", self._host, bound_port, self._path)
 
         self._spawn_bridge(bound_port)
         return True
@@ -151,17 +151,17 @@ class SlockAdapter(BasePlatformAdapter):
             await self._runner.cleanup()
             self._runner = None
         self._mark_disconnected()
-        logger.info("[slock] Disconnected")
+        logger.info("[raft] Disconnected")
 
     def _spawn_bridge(self, port: int) -> None:
-        raft_bin = shutil.which("raft") or shutil.which("slock")
+        raft_bin = shutil.which("raft")
         if not raft_bin:
-            logger.warning("[slock] raft/slock CLI not found in PATH; bridge not spawned — wake-only polling mode")
+            logger.warning("[raft] raft CLI not found in PATH; bridge not spawned — wake-only polling mode")
             return
 
-        profile = os.environ.get("RAFT_PROFILE") or os.environ.get("SLOCK_PROFILE", "")
+        profile = os.environ.get("RAFT_PROFILE", "")
         if not profile:
-            logger.warning("[slock] RAFT_PROFILE not set; bridge not spawned")
+            logger.warning("[raft] RAFT_PROFILE not set; bridge not spawned")
             return
 
         endpoint = f"http://{self._host}:{port}{self._path}"
@@ -174,9 +174,9 @@ class SlockAdapter(BasePlatformAdapter):
         env = {**os.environ, "RAFT_CHANNEL_TOKEN": self._bridge_token}
         try:
             self._bridge_process = subprocess.Popen(cmd, env=env)
-            logger.info("[slock] Spawned bridge pid=%d profile=%s endpoint=%s", self._bridge_process.pid, profile, endpoint)
+            logger.info("[raft] Spawned bridge pid=%d profile=%s endpoint=%s", self._bridge_process.pid, profile, endpoint)
         except Exception:
-            logger.exception("[slock] Failed to spawn bridge")
+            logger.exception("[raft] Failed to spawn bridge")
 
     def _stop_bridge(self) -> None:
         proc = self._bridge_process
@@ -186,12 +186,12 @@ class SlockAdapter(BasePlatformAdapter):
         try:
             proc.terminate()
             proc.wait(timeout=5)
-            logger.info("[slock] Bridge process terminated (pid=%d)", proc.pid)
+            logger.info("[raft] Bridge process terminated (pid=%d)", proc.pid)
         except subprocess.TimeoutExpired:
             proc.kill()
-            logger.warning("[slock] Bridge process killed after timeout (pid=%d)", proc.pid)
+            logger.warning("[raft] Bridge process killed after timeout (pid=%d)", proc.pid)
         except Exception:
-            logger.exception("[slock] Error stopping bridge")
+            logger.exception("[raft] Error stopping bridge")
 
     async def send(
         self,
@@ -201,21 +201,21 @@ class SlockAdapter(BasePlatformAdapter):
         metadata: Optional[Dict[str, Any]] = None,
     ) -> SendResult:
         hint = (
-            "Raft channel is wake-only; adapter send does not deliver to Slock. "
+            "Raft channel is wake-only; adapter send does not deliver to Raft. "
             "Use `raft message send --target \"<target>\"` with the exact target from "
-            "`raft message check`, or the legacy `slock message send` alias."
+            "`raft message check`."
         )
-        logger.warning("[slock] %s Dropped adapter response for %s: %s", hint, chat_id, content[:200])
+        logger.warning("[raft] %s Dropped adapter response for %s: %s", hint, chat_id, content[:200])
         return SendResult(success=False, error=hint, retryable=False)
 
     async def get_chat_info(self, chat_id: str) -> Dict[str, Any]:
-        return {"name": f"slock/{chat_id}", "type": "slock"}
+        return {"name": f"raft/{chat_id}", "type": "raft"}
 
     async def _handle_health(self, request: "web.Request") -> "web.Response":
         return web.json_response(
             {
                 "status": "ok",
-                "platform": "slock",
+                "platform": "raft",
                 "runtimeSession": self._runtime_session,
             }
         )
@@ -274,7 +274,7 @@ class SlockAdapter(BasePlatformAdapter):
 
     async def _accept_wake(self, payload: Dict[str, Any]) -> bool:
         if not self._message_handler:
-            logger.warning("[slock] Wake received before gateway message handler was attached")
+            logger.warning("[raft] Wake received before gateway message handler was attached")
             return False
 
         delivery_id = str(
@@ -284,13 +284,13 @@ class SlockAdapter(BasePlatformAdapter):
             or payload.get("delivery_id")
             or payload.get("wake_id")
             or payload.get("id")
-            or f"slock-wake-{int(time.time() * 1000)}"
+            or f"raft-wake-{int(time.time() * 1000)}"
         )
         source = self.build_source(
             chat_id=self._runtime_session,
             chat_name="Raft channel",
             chat_type="dm",
-            user_id="slock-bridge",
+            user_id="raft-bridge",
             user_name="Raft Bridge",
         )
         event = MessageEvent(
@@ -304,7 +304,7 @@ class SlockAdapter(BasePlatformAdapter):
         try:
             await self.handle_message(event)
         except Exception:
-            logger.exception("[slock] Failed to inject wake event")
+            logger.exception("[raft] Failed to inject wake event")
             return False
         return True
 
@@ -320,7 +320,7 @@ class SlockAdapter(BasePlatformAdapter):
         )
 
         if session_key in self._active_sessions:
-            logger.debug("[slock] Wake queued for busy session %s", session_key)
+            logger.debug("[raft] Wake queued for busy session %s", session_key)
             merge_pending_message_event(self._pending_messages, session_key, event)
             return
 
@@ -333,6 +333,5 @@ class SlockAdapter(BasePlatformAdapter):
             "Run `raft message check` to inspect and handle them. "
             "When you need to reply, use the exact `target=` shown by `raft message check` "
             "with `raft message send --target \"<target>\"`; for thread targets, keep the "
-            "same channel-or-DM suffix. If `raft` is not installed yet, use the legacy "
-            "`slock message check` / `slock message send` aliases."
+            "same channel-or-DM suffix."
         )

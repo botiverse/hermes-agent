@@ -163,7 +163,7 @@ class Platform(Enum):
     WEIXIN = "weixin"
     BLUEBUBBLES = "bluebubbles"
     QQBOT = "qqbot"
-    SLOCK = "slock"
+    RAFT = "raft"
     YUANBAO = "yuanbao"
 
     @classmethod
@@ -473,7 +473,7 @@ _PLATFORM_CONNECTED_CHECKERS: dict[Platform, Callable[[PlatformConfig], bool]] =
     Platform.SMS: lambda cfg: bool(os.getenv("TWILIO_ACCOUNT_SID")),
     Platform.API_SERVER: lambda cfg: True,
     Platform.WEBHOOK: lambda cfg: True,
-    Platform.SLOCK: lambda cfg: bool(cfg.extra.get("bridge_token")),
+    Platform.RAFT: lambda cfg: bool(cfg.extra.get("bridge_token")),
     Platform.MSGRAPH_WEBHOOK: lambda cfg: bool(
         str(cfg.extra.get("client_state") or "").strip()
     ),
@@ -1687,34 +1687,34 @@ def _apply_env_overrides(config: GatewayConfig) -> None:
 
     # Raft channel platform for external-agent wake delivery.
     raft_enabled_raw = os.getenv("RAFT_CHANNEL_ENABLED", "")
-    slock_enabled = raft_enabled_raw.lower() in {
+    raft_enabled = raft_enabled_raw.lower() in {
         "true",
         "1",
         "yes",
     }
-    slock_bridge_token = os.getenv("RAFT_CHANNEL_TOKEN", "")
-    if slock_enabled or slock_bridge_token:
-        if Platform.SLOCK not in config.platforms:
-            config.platforms[Platform.SLOCK] = PlatformConfig()
-        config.platforms[Platform.SLOCK].enabled = True
-        if slock_bridge_token:
-            config.platforms[Platform.SLOCK].extra["bridge_token"] = slock_bridge_token
-        slock_host = os.getenv("RAFT_CHANNEL_HOST")
-        if slock_host:
-            config.platforms[Platform.SLOCK].extra["host"] = slock_host
-        slock_port = os.getenv("RAFT_CHANNEL_PORT")
-        if slock_port:
+    raft_bridge_token = os.getenv("RAFT_CHANNEL_TOKEN", "")
+    if raft_enabled or raft_bridge_token:
+        if Platform.RAFT not in config.platforms:
+            config.platforms[Platform.RAFT] = PlatformConfig()
+        config.platforms[Platform.RAFT].enabled = True
+        if raft_bridge_token:
+            config.platforms[Platform.RAFT].extra["bridge_token"] = raft_bridge_token
+        raft_host = os.getenv("RAFT_CHANNEL_HOST")
+        if raft_host:
+            config.platforms[Platform.RAFT].extra["host"] = raft_host
+        raft_port = os.getenv("RAFT_CHANNEL_PORT")
+        if raft_port:
             try:
-                config.platforms[Platform.SLOCK].extra["port"] = int(slock_port)
+                config.platforms[Platform.RAFT].extra["port"] = int(raft_port)
             except ValueError:
                 pass
-        slock_path = os.getenv("RAFT_CHANNEL_PATH")
-        if slock_path:
-            config.platforms[Platform.SLOCK].extra["path"] = slock_path
-        slock_runtime_session = os.getenv("RAFT_CHANNEL_RUNTIME_SESSION")
-        if slock_runtime_session:
-            config.platforms[Platform.SLOCK].extra["runtime_session"] = (
-                slock_runtime_session
+        raft_path = os.getenv("RAFT_CHANNEL_PATH")
+        if raft_path:
+            config.platforms[Platform.RAFT].extra["path"] = raft_path
+        raft_runtime_session = os.getenv("RAFT_CHANNEL_RUNTIME_SESSION")
+        if raft_runtime_session:
+            config.platforms[Platform.RAFT].extra["runtime_session"] = (
+                raft_runtime_session
             )
 
     # Microsoft Graph webhook platform

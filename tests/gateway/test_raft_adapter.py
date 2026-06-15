@@ -7,10 +7,10 @@ from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
 from gateway.config import GatewayConfig, Platform, PlatformConfig, _apply_env_overrides
-from gateway.platforms.slock import (
+from gateway.platforms.raft import (
     BRIDGE_TOKEN_HEADER,
     DEFAULT_PATH,
-    SlockAdapter,
+    RaftAdapter,
     _has_content_field,
 )
 from gateway.session import build_session_key
@@ -30,24 +30,24 @@ def _make_config(**extra):
 
 
 def _make_adapter(**extra):
-    return SlockAdapter(_make_config(**extra))
+    return RaftAdapter(_make_config(**extra))
 
 
-def _create_app(adapter: SlockAdapter) -> web.Application:
+def _create_app(adapter: RaftAdapter) -> web.Application:
     app = web.Application()
     app.router.add_get("/health", adapter._handle_health)
     app.router.add_post(adapter._path, adapter._handle_wake)
     return app
 
 
-class TestSlockWakePayload:
+class TestRaftWakePayload:
     def test_detects_content_fields(self):
         assert _has_content_field({"text": "hello"}) is True
         assert _has_content_field({"nested": {"messages": []}}) is True
         assert _has_content_field({"eventId": "evt-1", "messageId": "msg-1"}) is False
 
 
-class TestSlockWakeHttp:
+class TestRaftWakeHttp:
     @pytest.mark.asyncio
     async def test_send_reports_wake_only_hint(self):
         adapter = _make_adapter()
@@ -58,7 +58,6 @@ class TestSlockWakeHttp:
         assert result.retryable is False
         assert "wake-only" in result.error
         assert "raft message send" in result.error
-        assert "slock message send" in result.error
 
     @pytest.mark.asyncio
     async def test_rejects_missing_bridge_token(self):
@@ -147,13 +146,11 @@ class TestSlockWakeHttp:
         assert event.raw_message["eventId"] == "wake-1"
         assert event.raw_message["attemptId"] == "attempt-1"
         assert event.raw_message["messageId"] == "msg-1"
-        assert event.source.platform == Platform.SLOCK
+        assert event.source.platform == Platform.RAFT
         assert event.source.chat_id == "default"
         assert "raft message check" in event.text
         assert "raft message send" in event.text
         assert 'target=' in event.text
-        assert "slock message check" in event.text
-        assert "slock message send" in event.text
 
     @pytest.mark.asyncio
     async def test_busy_session_queues_without_interrupt(self):
@@ -165,7 +162,7 @@ class TestSlockWakeHttp:
             chat_id="default",
             chat_name="Raft channel",
             chat_type="dm",
-            user_id="slock-bridge",
+            user_id="raft-bridge",
             user_name="Raft Bridge",
         )
         session_key = build_session_key(source)
@@ -182,7 +179,7 @@ class TestSlockWakeHttp:
         assert "raft message send" in pending.text
 
 
-class TestSlockConfig:
+class TestRaftConfig:
     def test_env_overrides_enable_raft_platform(self, monkeypatch):
         monkeypatch.setenv("RAFT_CHANNEL_TOKEN", "bridge-secret")
         monkeypatch.setenv("RAFT_CHANNEL_PORT", "8765")
@@ -191,26 +188,24 @@ class TestSlockConfig:
         config = GatewayConfig()
         _apply_env_overrides(config)
 
-        assert Platform.SLOCK in config.platforms
-        slock_config = config.platforms[Platform.SLOCK]
-        assert slock_config.enabled is True
-        assert slock_config.extra["bridge_token"] == "bridge-secret"
-        assert slock_config.extra["port"] == 8765
-        assert slock_config.extra["runtime_session"] == "main"
-        assert config.get_connected_platforms() == [Platform.SLOCK]
+        assert Platform.RAFT in config.platforms
+        raft_config = config.platforms[Platform.RAFT]
+        assert raft_config.enabled is True
+        assert raft_config.extra["bridge_token"] == "bridge-secret"
+        assert raft_config.extra["port"] == 8765
+        assert raft_config.extra["runtime_session"] == "main"
+        assert config.get_connected_platforms() == [Platform.RAFT]
 
     def test_platform_metadata_and_toolset_are_registered(self):
         from agent.prompt_builder import PLATFORM_HINTS
         from hermes_cli.tools_config import PLATFORMS
         from toolsets import TOOLSETS, validate_toolset
 
-        assert PLATFORMS["slock"]["label"] == "🔔 Raft"
-        assert PLATFORMS["slock"]["default_toolset"] == "hermes-slock"
-        assert "hermes-slock" in TOOLSETS
-        assert "hermes-slock" in TOOLSETS["hermes-gateway"]["includes"]
-        assert validate_toolset("hermes-slock")
-        assert "raft message send" in TOOLSETS["hermes-slock"]["description"]
-        assert "raft message check" in PLATFORM_HINTS["slock"]
-        assert "raft message send" in PLATFORM_HINTS["slock"]
-        assert "slock message check" in PLATFORM_HINTS["slock"]
-        assert "slock message send" in PLATFORM_HINTS["slock"]
+        assert PLATFORMS["raft"]["label"] == "🔔 Raft"
+        assert PLATFORMS["raft"]["default_toolset"] == "hermes-raft"
+        assert "hermes-raft" in TOOLSETS
+        assert "hermes-raft" in TOOLSETS["hermes-gateway"]["includes"]
+        assert validate_toolset("hermes-raft")
+        assert "raft message send" in TOOLSETS["hermes-raft"]["description"]
+        assert "raft message check" in PLATFORM_HINTS["raft"]
+        assert "raft message send" in PLATFORM_HINTS["raft"]
