@@ -207,5 +207,5 @@ class TestRaftConfig:
         assert "hermes-raft" in TOOLSETS["hermes-gateway"]["includes"]
         assert validate_toolset("hermes-raft")
         assert "raft message check" in TOOLSETS["hermes-raft"]["description"]
+        assert "raft profile show" in PLATFORM_HINTS["raft"]
         assert "raft manual get" in PLATFORM_HINTS["raft"]
-        assert "raft message check" in PLATFORM_HINTS["raft"]

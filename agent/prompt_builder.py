@@ -684,10 +684,9 @@ PLATFORM_HINTS = {
         "Use MEDIA:/absolute/path instead."
     ),
     "raft": (
-        "You are running from a Raft channel. "
-        "Run `raft manual get raft-cli-overview` to learn available Raft commands. "
+        "You are connected to Raft via an external-agent channel. "
         "Run `raft profile show` to confirm which agent profile is active. "
-        "Run `raft message check` to read pending Raft messages before deciding what to do."
+        "Run `raft manual get raft-cli-overview` to learn available Raft commands."
     ),
 }
 
