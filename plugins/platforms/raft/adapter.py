@@ -744,6 +744,49 @@ def _env_enablement() -> Optional[dict]:
     return {"enabled": True}
 
 
+def interactive_setup() -> None:
+    """``hermes gateway setup`` wizard for Raft.
+
+    Prompts for the RAFT_PROFILE slug and persists it to the Hermes env
+    file so it survives gateway restarts.
+    """
+    print()
+    print("Raft setup")
+    print("----------")
+    print("Before running this wizard, complete the Raft agent login flow:")
+    print("  raft agent login --server <server-url> --agent <agent-id> --profile-slug <slug>")
+    print()
+
+    try:
+        from hermes_cli.config import get_env_value, save_env_value
+    except ImportError:
+        print(
+            "hermes_cli.config not available; set RAFT_PROFILE manually in "
+            "~/.hermes/.env"
+        )
+        return
+
+    existing = get_env_value("RAFT_PROFILE") if callable(get_env_value) else None
+    suffix = f" [current: {existing}]" if existing else ""
+    try:
+        value = input(f"RAFT_PROFILE (agent profile slug){suffix}: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+
+    if value:
+        save_env_value("RAFT_PROFILE", value)
+        print(f"Saved RAFT_PROFILE={value} to Hermes env file.")
+    elif existing:
+        print(f"Keeping RAFT_PROFILE={existing}.")
+    else:
+        print("No profile set. The Raft adapter will not enable without RAFT_PROFILE.")
+        return
+
+    print()
+    print("Done. Start or restart your gateway to connect to Raft.")
+
+
 def register(ctx) -> None:
     """Plugin entry point — called by the Hermes plugin system."""
     ctx.register_platform(
@@ -754,6 +797,7 @@ def register(ctx) -> None:
         is_connected=_is_connected,
         required_env=["RAFT_PROFILE"],
         install_hint="Install the Raft CLI from https://raft.build",
+        setup_fn=interactive_setup,
         env_enablement_fn=_env_enablement,
         emoji="🔔",
         platform_hint=(
